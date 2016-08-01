@@ -12,7 +12,7 @@ acknowledge Thomas Sharp for providing the code for exact inference.
 
 In this library are additional methods provided to perform the State-Space
 Analysis approximately. This includes pseudolikelihood, TAP, and Bethe
-approximations. For details see: <>
+approximations. For details see: <http://arxiv.org/abs/1607.08840>
 
 Copyright (C) 2016
 

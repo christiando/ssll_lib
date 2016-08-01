@@ -14,7 +14,9 @@ See the original paper for mathematical details, and example_exact.py for a
 demonstration of how to use the program.
 
 Approximation Methods:
-See arxiv publication <> for mathematical details on approximation methods.
-Demonstration of approximation methods in example_approx.py.
+See arxiv publication <http://arxiv.org/abs/1607.08840> (not peer reviewed) for
+mathematical
+details on approximation methods. Demonstration of approximation methods in
+example_approx.py.
 
 Contact for queries: Christian Donner
