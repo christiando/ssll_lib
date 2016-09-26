@@ -86,7 +86,8 @@ def generate_data_ctime(data_path='../Data/', max_network_size=60,
         t1 = time.time()
         result = __init__.run(spikes, O, map_function='cg',
                                     param_est='pseudo',
-                           param_est_eta='bethe_hybrid', lmbda1=100,
+                           param_est_eta='bethe_hybrid',
+                            lmbda1=100,
                            lmbda2=200)
         t2 = time.time()
         ctime_bethe = t2 - t1
@@ -108,10 +109,9 @@ def generate_data_ctime(data_path='../Data/', max_network_size=60,
             ctime_TAP = numpy.nan
 
         f = h5py.File(data_path + 'comp_time_data.h5', 'r+')
-        f['ctime'][0, i] = ctime_TAP
+        f['ctime'][1, i] = ctime_TAP
         f.close()
 
-        f.close()
 
 if __name__=='__main__':
     generate_data_ctime(data_path='', max_network_size=10,
