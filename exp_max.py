@@ -133,7 +133,7 @@ def e_step_smooth(emd):
             emd.sigma_s_lag[i+1] = numpy.dot(A, numpy.diag(emd.sigma_s[i+1])).diagonal()
 
 
-def m_step(emd):
+def m_step(emd, stationary='None'):
     """
     Computes the optimised hyperparameters of the natural parameters of the
     posterior distributions over time. `Q' is the covariance matrix of the
@@ -142,11 +142,13 @@ def m_step(emd):
 
     :param container.EMData emd:
         All data pertaining to the EM algorithm.
+    :param stationary:
+        If 'all' stationary on all thetas is assumed.
     """
     # Update the initial mean of the one-step-prediction density
-    emd.theta_o[0,:] = emd.theta_s[0,:]
+    emd.theta_o[0, :] = emd.theta_s[0, :]
     # Compute the state-transition hyperparameter
-    m_step_Q3(emd)
+    m_step_Q(emd, stationary)
     #m_step_F(emd)
 
 
@@ -175,33 +177,51 @@ def m_step_F(emd):
     emd.F = numpy.dot(a, numpy.linalg.inv(b))
 
 
-def m_step_Q(emd):
+def m_step_Q(emd, stationary):
     """
     Computes the optimised state-transition covariance hyperparameters `Q' of
-    the natural parameters of the posterior distributions over time.
+    the natural parameters of the posterior distributions over time. Here
+    just one single scalar is considered
 
     :param container.EMData emd:
         All data pertaining to the EM algorithm.
+    :param stationary:
+        If 'all' stationary on all thetas is assumed.
     """
     inv_lmbda = 0
-    for i in range(1, emd.T):
-        # Loading saved lag-one smoother
-        lag_one_covariance = emd.sigma_s_lag[i,:,:]
-        tmp = emd.theta_s[i,:] - emd.theta_s[i-1,:]
-        inv_lmbda += numpy.trace(emd.sigma_s[i,:,:]) -\
-                 2 * numpy.trace(lag_one_covariance)  +\
-                 numpy.trace(emd.sigma_s[i-1,:,:])  +\
-                 numpy.dot(tmp, tmp)
-    emd.Q = inv_lmbda / emd.D / (emd.T - 1) * numpy.identity(emd.D)
+    if emd.param_est_eta == 'exact':
+        for i in range(1, emd.T):
+            lag_one_covariance = emd.sigma_s_lag[i, :, :]
+            tmp = emd.theta_s[i, :] - emd.theta_s[i - 1, :]
+            inv_lmbda += numpy.trace(emd.sigma_s[i, :, :]) - \
+                         2 * numpy.trace(lag_one_covariance) + \
+                         numpy.trace(emd.sigma_s[i - 1, :, :]) + \
+                         numpy.dot(tmp, tmp)
+        emd.Q = inv_lmbda / emd.D / (emd.T - 1) * numpy.identity(emd.D)
+    else:
+        for i in range(1, emd.T):
+            lag_one_covariance = emd.sigma_s_lag[i, :]
+            tmp = emd.theta_s[i, :] - emd.theta_s[i - 1, :]
+            inv_lmbda += numpy.sum(emd.sigma_s[i]) - \
+                         2 * numpy.sum(lag_one_covariance) + \
+                         numpy.sum(emd.sigma_s[i - 1]) + \
+                         numpy.dot(tmp, tmp)
+        emd.Q = inv_lmbda / emd.D / (emd.T - 1) * \
+                numpy.identity(emd.D)
+    if stationary == 'all':
+        emd.Q = numpy.zeros(emd.Q.shape)
 
 
-def m_step_Q2(emd):
+def m_step_Q2(emd, stationary):
     """
     Computes the optimised state-transition covariance hyperparameters `Q' of
-    the natural parameters of the posterior distributions over time.
+    the natural parameters of the posterior distributions over time. Two
+    different scalars for theta_1 and theta_2 are considered
 
     :param container.EMData emd:
         All data pertaining to the EM algorithm.
+    :param stationary:
+        If 'all' stationary on all thetas is assumed.
     """
     inv_lmbda1 = 0.
     inv_lmbda2 = 0.
@@ -223,6 +243,9 @@ def m_step_Q2(emd):
         emd.Q[:emd.N,:emd.N] = inv_lmbda1 / emd.N / (emd.T - 1) * numpy.identity(emd.N)
         if emd.order > 1:
             emd.Q[emd.N:,emd.N:] = inv_lmbda2 / (emd.D - emd.N) / (emd.T - 1) * numpy.identity(emd.D - emd.N)
+
+        if stationary == 'all':
+            emd.Q[:, :] = 0
     # Computation for approximate case with diagonal covariance matrix
     else:
         for i in range(1, emd.T):
@@ -238,17 +261,24 @@ def m_step_Q2(emd):
                           numpy.sum(emd.sigma_s[i - 1, emd.N:]) + \
                           numpy.inner(tmp[emd.N:], tmp[emd.N:])
 
-        emd.Q[:emd.N, :emd.N] = inv_lmbda1 / emd.N / (emd.T - 1) * numpy.identity(emd.N)
+        emd.Q[:emd.N, :emd.N] = inv_lmbda1 / emd.N / (emd.T - 1) * \
+                                numpy.identity(emd.N)
         if emd.order > 1:
-            emd.Q[emd.N:, emd.N:] = inv_lmbda2 / (emd.D - emd.N) / (emd.T - 1) * numpy.identity(emd.D - emd.N)
+            emd.Q[emd.N:, emd.N:] = inv_lmbda2 / (emd.D - emd.N) / \
+                                    (emd.T - 1) * numpy.identity(emd.D - emd.N)
+        if stationary == 'all':
+            emd.Q[:] = 0
 
-def m_step_Q3(emd):
+def m_step_Q3(emd, stationary):
     """
     Computes the optimised state-transition covariance hyperparameters `Q' of
-    the natural parameters of the posterior distributions over time.
+    the natural parameters of the posterior distributions over time. For each
+    individual theta a hyperparameter is considered.
 
     :param container.EMData emd:
         All data pertaining to the EM algorithm.
+    :param stationary:
+        If 'all' stationary on all thetas is assumed.
     """
     lmbda = numpy.zeros([emd.Q.shape[0]])
     # Computation for exact case with full covariance matrix
@@ -258,9 +288,12 @@ def m_step_Q3(emd):
             lag_one_covariance = emd.sigma_s_lag[i,:,:]
             tmp = emd.theta_s[i,:] - emd.theta_s[i-1,:]
             lmbda += numpy.diagonal(emd.sigma_s[i,:,:]) -\
-                     2 * numpy.diagonal(lag_one_covariance[:,:])  +\
-                     numpy.diagonal(emd.sigma_s[i-1,:,:])  +\
+                     2 * numpy.diagonal(lag_one_covariance[:,:]) +\
+                     numpy.diagonal(emd.sigma_s[i-1,:,:]) +\
                      tmp**2
+
+        if stationary == 'all':
+            lmbda[:,:] = 0
     # Computation for approximate case with diagonal covariance matrix
     else:
         for i in range(1, emd.T):
@@ -272,5 +305,7 @@ def m_step_Q3(emd):
                      emd.sigma_s[i-1]  +\
                      tmp**2
 
+        if stationary == 'all':
+            lmbda[:] = 0
 
-    emd.Q = numpy.diag(lmbda/ (emd.T - 1))
+    emd.Q = numpy.diag(lmbda / (emd.T - 1))

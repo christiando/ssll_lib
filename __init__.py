@@ -49,8 +49,9 @@ import energies
 import bethe_approximation
 
 
-def run(spikes, order, window=1, map_function='nr', lmbda1=100, lmbda2=200,
-        max_iter=100, param_est='exact', param_est_eta='exact'):
+def run(spikes, order, window=1, map_function='nr', lmbda1=100,
+        lmbda2=100, max_iter=100,
+        param_est='exact', param_est_eta='exact', stationary='None'):
     """
     Master-function of the State-Space Analysis of Spike Correlation package.
     Uses the expectation-maximisation algorithm to find the probability
@@ -87,6 +88,9 @@ def run(spikes, order, window=1, map_function='nr', lmbda1=100, lmbda2=200,
         Eta parameters are either calculated exactly ('exact'), by mean
         field TAP approximation ('TAP'), or Bethe approximation (belief
         propagation-'bethe_BP', CCCP-'bethe_CCCP', hybrid-'bethe_hybrid')
+    :param stationary:
+        To fit stationary model. Set 'all' to have stationary thetas. (
+        Default='None')
 
     :returns:
         Results encapsulated in a container.EMData object, containing the
@@ -99,32 +103,36 @@ def run(spikes, order, window=1, map_function='nr', lmbda1=100, lmbda2=200,
     # Get Number of cells
     N = spikes.shape[2]
     # Initialise the EM-data container
-    emd = container.EMData(spikes, order, window, param_est, param_est_eta, map_function, lmbda1, lmbda2)
-    # Solves backward problem. For zero rates in the beginning small number is added
+    if stationary == 'all':
+        lmbda1, lmbda2 = numpy.inf, numpy.inf
+
+    emd = container.EMData(spikes, order, window, param_est, param_est_eta,
+                           map_function, lmbda1, lmbda2)
+    # Solves backward problem. For zero rates in the beginning small
+    # number is added
     if emd.order == 2:
-        #try:
+
         y_init = numpy.mean(emd.y, axis=0)
         y_init[y_init == 0] = numpy.spacing(1)
-        #    emd.theta_o[0] = mean_field.backward_problem(y_init, emd.N, 'TAP')
-        #except numpy.linalg.linalg.LinAlgError:
+
         emd.theta_o[0][:emd.N] = energies.compute_ind_theta(y_init[:emd.N])
 
     # Set up loop guards for the EM algorithm
-    lmp = -numpy.inf
     lmc = emd.marg_llk(emd)
     # Iterate the EM algorithm until convergence or failure
     while (emd.iterations < max_iter) and (emd.convergence > exp_max.CONVERGED):
-        print 'EM Iteration: %d - Convergence %.6f > %.6f' %(emd.iterations,
-                                                             emd.convergence,
-                                                             exp_max.CONVERGED)
+        print 'EM Iteration: %d - Convergence %.6f > %.6f' % (emd.iterations,
+                                                              emd.convergence,
+                                                              exp_max.CONVERGED)
         # Perform EM
         exp_max.e_step(emd)
-        exp_max.m_step(emd)
+        exp_max.m_step(emd, stationary)
         # Update previous and current log marginal values
         lmp = lmc
         lmc = emd.marg_llk(emd)
         emd.mllk = lmc
         # Update EM algorithm metadata
         emd.iterations += 1
-        emd.convergence = numpy.absolute((lmp - lmc) / lmp)
+        emd.convergence = (lmp - lmc) / lmp
+
     return emd
